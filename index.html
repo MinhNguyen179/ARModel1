@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <script src="https://unpkg.com/@onirix/embed-sdk@latest/dist/ox-embed-sdk.umd.js"></script>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://www.onirix.com/webar/ox-devicemotion.min.js"></script>
+    <iframe id="visor" style="position:fixed;top:0;left:0; right:0;bottom:0;z-index:999;max-width:100vw;width:100%;height:100%; display:block;border:none;" src="https://studio.onirix.com/projects/7316288d976f4bf6ace907b59bcbfe23/webar?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjMwNzcwLCJwcm9qZWN0SWQiOjYwMjQxLCJyb2xlIjozLCJpYXQiOjE2OTg1NzE2ODJ9.H8YS_-yrDcxA7GLJ3hs7urx437nXHV2IKa-XDhll02s&background=alpha&preview=false&hide_controls=false&ar_button=false" allow="camera;gyroscope;accelerometer;magnetometer;fullscreen;xr-spatial-tracking;geolocation;"></iframe>
+<!--    <script async type="module" src="animation.js"></script>-->
+    <title>Onirix Web AR SDK - A-Frame surface-tracking test</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<script>
+    /**
+     * This class is in charge of handling the interaction with the AR experience through the EmbedSDK.
+     */
+    class OxExperience {
+        /**
+         * Names of the elements in the AR experiences.
+         */
+        BCKSOUND = "audio-quiz";
+        AUDIO_INCORRECT = 'audio-incorrect';
+        AUDIO_CORRECT = 'audio-correct';
+        ELEMENT_PI = 'element'
+        ELEMENT_FAIL_PI = 'element fail';
+
+        /**
+         * Pi element animations.
+         */
+        PI_ANIMATIONS = {
+            celebration: { name: 'Celebration', duration: 3 },
+            fail: { name: 'Destruction', duration: 2.2333333492279053 },
+        }
+
+        /**
+         * Constructor.
+         *
+         * @param embedSDK allows you to listen to events and control the scene content.
+         */
+        constructor(embedSDK) {
+            this.embedSDK = embedSDK;
+        }
+
+        /**
+         * It allows executing element's animations.
+         *
+         * @param name       name of the element where we want the animation to be applied.
+         * @param animation  name of the animation that we want to run.
+         * @param loop       if we want the animation to run in a loop, by default it always takes the false value.
+         */
+        async playAnimation(name, animation, loop = false) {
+            await this.embedSDK.playAnimation(name, animation.name, loop);
+            await this.sleep(animation.duration * 1000);
+        }
+
+        /**
+         * Sleep the program as many more as indicated
+         *
+         * @param ms  time in milliseconds that you want the program to stop
+         */
+        async sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        /**
+         * Stops the background music, activates the fail sound and shows the fail animation, finally puts the background music back on.
+         */
+        async failQuestion() {
+            this.embedSDK.pause(this.BCKSOUND);
+            this.embedSDK.play(this.AUDIO_INCORRECT);
+            this.embedSDK.disable(this.ELEMENT_PI);
+            this.embedSDK.enable(this.ELEMENT_FAIL_PI);
+            await this.playAnimation(this.ELEMENT_FAIL_PI, this.PI_ANIMATIONS.fail);
+            this.embedSDK.play(this.BCKSOUND);
+        }
+
+        /**
+         * Stops the background music, activates the succes sound and shows the succes animation, finally puts the background music back on.
+         */
+        async correctQuestion() {
+            this.embedSDK.pause(this.BCKSOUND);
+            this.embedSDK.play(this.AUDIO_CORRECT);
+            await this.playAnimation(this.ELEMENT_PI, this.PI_ANIMATIONS.celebration);
+            this.embedSDK.play(this.BCKSOUND);
+        }
+
+        /**
+         * Disable ELEMENT_FAIL_PI and enable ELEMENT_PI
+         */
+        async tryAgain() {
+            this.embedSDK.disable(this.ELEMENT_FAIL_PI);
+            this.embedSDK.enable(this.ELEMENT_PI);
+        }
+    }
+
+    /**
+     * This class is in charge of handling the interaction with the custom html and css code.
+     */
+    class OxExperienceUI {
+
+        /**
+         * Html elements ids.
+         */
+        OX_Q_QUESTION = 'ox_q-question';
+        OX_Q_STATEMENT = 'ox_q-question__statement';
+        OX_Q_ANSWER_0 = 'ox_answer__1';
+        OX_Q_ANSWER_1 = 'ox_answer__2';
+        OX_Q_FAIL_CARD = 'ox_q-fail-card';
+        OX_Q_SUCCES_CARD = 'ox_q-success-card';
+        OX_Q_CARDS = 'ox_q-cards';
+        OX_Q_BANNER = 'ox_q-banner';
+        OX_Q_SUCCES_CARD_STATEMENT = 'ox-success-card__statement';
+        OX_TRY_AGAIN = 'ox-try-again';
+        OX_NEXT_QUESTION = 'ox-next-question';
+        OX_AUDIO = 'ox-audio';
+        CLOSE = 'ox-audio__close';
+
+        /**
+         * Array of available questions.
+         * Em tạm thời hard code phần này, đoạn này có thể thay thế bằng việc lấy dữ liệu từ DB vào ạ.
+         */
+        QUESTIONS = [
+            {
+                statement: 'Complete the sequence... 0, 1, 1, 2, 3, 5, 8, 13',
+                answers: [
+                    { statement: '21', correct: true},
+                    { statement: '23', correct: false},
+                ]
+            },
+            {
+                statement: 'Solve the following operation: (20x2)-30+7',
+                answers: [
+                    { statement: '17', correct: true},
+                    { statement: '3', correct: false},
+                ]
+            },
+            {
+                statement: 'Solve the following first-degree equation: x + 8 = 12 - x',
+                answers: [
+                    { statement: 'x = 4', correct: false},
+                    { statement: 'x = 2', correct: true},
+                ]
+            }
+        ]
+
+        /**
+         * Callback to be executed when a question is failed.
+         */
+        onFailAnswer = null;
+
+        /**
+         * Callback to be executed when a question is correct.
+         */
+        onCorrectAnswer = null;
+
+        /**
+         * Callback to be executed when user click try again button.
+         */
+        tryAgain = null;
+
+        /**
+         * The index of the current question on the Questions array.
+         */
+        currentQuestionIndex = 0;
+
+        /**
+         * Method responsible for teaching the question
+         */
+        showQuestion = function () {
+            document.getElementById(this.OX_Q_CARDS).style.position = 'fixed'
+            document.getElementById(this.OX_Q_QUESTION).classList.add('show');
+        }
+
+        /**
+         * Indicates the time the toast is available
+         */
+        availableTime = 3000;
+
+        /**
+         * Initialize user interactions with HTML elements.
+         */
+        init() {
+            document.getElementById(this.OX_Q_ANSWER_0).addEventListener('click', (event) => this.answerHandler(event));
+            document.getElementById(this.OX_Q_ANSWER_1).addEventListener('click', (event) => this.answerHandler(event));
+            document.getElementById(this.OX_NEXT_QUESTION).addEventListener('click', () => this.nextQuestion());
+            document.getElementById(this.OX_TRY_AGAIN).addEventListener('click', async () => this.againHandler());
+            this.prepareQuestion(this.currentQuestionIndex);
+        }
+
+        /**
+         * Handle the user answer.
+         *
+         * @internal
+         * @param    event pointer event.
+         */
+        answerHandler(event) {
+            if ('true' == event.target.getAttribute('data-correct')) {
+                this.correctAnswer();
+            } else {
+                this.incorrectHandler();
+            }
+        }
+
+        /**
+         * Load statement and answers texts.
+         *
+         * @internal
+         * @param   questionIndex index of the question on the questions array.
+         */
+        prepareQuestion(questionIndex) {
+            const question = this.QUESTIONS[questionIndex];
+            if (null != question) {
+                document.getElementById(this.OX_Q_STATEMENT).innerHTML = question.statement;
+                this.prepareAnswer(this.OX_Q_ANSWER_0, question.answers[0]);
+                this.prepareAnswer(this.OX_Q_ANSWER_1, question.answers[1]);
+            }
+        }
+
+        /**
+         * Load answer text and correct attribute.
+         *
+         * @internal
+         * @param htmlElementId Id of the html answer's element.
+         * @param answer        Object with the answer's data.
+         */
+        prepareAnswer(htmlElementId, answer) {
+            const htmlElement = document.getElementById(htmlElementId);
+            htmlElement.innerHTML = answer.statement;
+            htmlElement.setAttribute('data-correct', answer.correct);
+        }
+
+        /**
+         * Handles incorrect answers. Show the incorrect answer card.
+         */
+        async incorrectHandler() {
+            document.getElementById(this.OX_Q_QUESTION).classList.remove('show');
+            if (this.onFailAnswer) {
+                await this.onFailAnswer();
+            }
+            document.getElementById(this.OX_Q_FAIL_CARD).classList.add('show');
+        }
+
+        /**
+         * Manage the correct answers. Increases the index of the questions and displays the correct answer card.
+         */
+        async correctAnswer() {
+            document.getElementById(this.OX_Q_QUESTION).classList.remove('show');
+            if (this.onCorrectAnswer) {
+                await this.onCorrectAnswer();
+            }
+            this.currentQuestionIndex++;
+            if (this.currentQuestionIndex < this.QUESTIONS.length) {
+                this.prepareQuestion(this.currentQuestionIndex);
+            } else {
+
+                document.getElementById(this.OX_Q_SUCCES_CARD_STATEMENT).innerHTML = 'You have answered correctly all our questions!';
+                document.getElementById(this.OX_NEXT_QUESTION).innerHTML = 'Try Onirix!';
+            }
+            document.getElementById(this.OX_Q_SUCCES_CARD).classList.add('show');
+        }
+
+        /**
+         * Manage the click on "next question". Hide the correct answer panel.
+         */
+        nextQuestion() {
+            document.getElementById(this.OX_Q_CARDS).style.position = 'inherit'
+            document.getElementById(this.OX_Q_SUCCES_CARD).classList.remove('show');
+            if (this.currentQuestionIndex >= this.QUESTIONS.length) {
+                window.document.location.replace('https://studio.onirix.com/register?cta=exp-onx-math-quiz');
+            } else {
+                this.againHandler();
+            }
+        }
+
+        /**
+         * Function that is executed when the question fails, hides the fails card and trigger tryAgain callback.
+         */
+        async againHandler() {
+            document.getElementById(this.OX_Q_CARDS).style.position = 'inherit';
+            document.getElementById(this.OX_Q_FAIL_CARD).classList.remove('show');
+            if (this.tryAgain) {
+                await this.tryAgain();
+            }
+        }
+
+        /**
+         * Show the toast that indicates the experience has audio
+         */
+        toggleAudioToast() {
+            document.getElementById(this.OX_AUDIO).style.display = 'block';
+            setTimeout(() => {
+                document.getElementById(this.OX_AUDIO).style.display = 'none';
+            }, this.availableTime);
+
+            document.getElementById(this.CLOSE).addEventListener('click',() => {
+                document.getElementById(this.OX_AUDIO).style.display = 'none';
+            })
+        }
+
+        /**
+         * Enable the footer
+         */
+        showBanner() {
+            document.getElementById(this.OX_Q_BANNER).style.display = "block";
+        }
+    }
+
+    /**
+     * Onirix Embed SDK allows you to listen to events and control the scene when embedding experiences in a custom domain or from the online code editor.
+     * For more information visit https://docs.onirix.com/onirix-sdk/embed-sdk
+     */
+    // const embedSDK = new OnirixEmbedSDK("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjMwNzcwLCJwcm9qZWN0SWQiOjYwMjQxLCJyb2xlIjozLCJpYXQiOjE2OTg1NzE2ODJ9.H8YS_-yrDcxA7GLJ3hs7urx437nXHV2IKa-XDhll02s");
+    // embedSDK.connect();
+
+    const iframeElement = document.getElementById("your_iframe_id_here");
+    const embedSDK = new OnirixEmbedSDK(iframeElement);
+    embedSDK.connect();
+
+    const oxExperience = new OxExperience(embedSDK);
+
+    const oxExperienceUi = new OxExperienceUI();
+    oxExperienceUi.init();
+
+    oxExperienceUi.onFailAnswer = async () => {
+        await oxExperience.failQuestion();
+    }
+
+    oxExperienceUi.onCorrectAnswer = async () => {
+        await oxExperience.correctQuestion();
+    }
+
+    oxExperienceUi.tryAgain = async () => {
+        await oxExperience.tryAgain();
+    }
+
+
+    /**
+     * Listens when a user clicks on an element in the scene. it checks the name of the element and if it matches it shows the question
+     */
+    embedSDK.subscribe(OnirixEmbedSDK.Events.ELEMENT_CLICK, (params) => {
+        if (params.name == oxExperience.ELEMENT_PI) {
+            oxExperienceUi.showQuestion();
+        }
+    });
+
+    /**
+     * It's execute when the scene is totally load and it start the game
+     */
+    embedSDK.subscribe(OnirixEmbedSDK.Events.SCENE_LOAD_END, async (params) => {
+        oxExperienceUi.toggleAudioToast();
+        oxExperienceUi.showBanner();
+    });
+</script>
+<body>
+<div id="ox-audio">
+    <div id="ox-audio__container">
+        <div id="ox-audio__icon">
+            <svg width="58" height="56" viewBox="0 0 58 56" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <filter x="-9%" y="-46.6%" width="118%" height="193.1%" filterUnits="objectBoundingBox" id="srumujwtua">
+                        <feOffset dy="2" in="SourceAlpha" result="shadowOffsetOuter1"/>
+                        <feGaussianBlur stdDeviation="6" in="shadowOffsetOuter1" result="shadowBlurOuter1"/>
+                        <feColorMatrix values="0 0 0 0 0.129411765 0 0 0 0 0.121568627 0 0 0 0 0.121568627 0 0 0 0.24 0" in="shadowBlurOuter1" result="shadowMatrixOuter1"/>
+                        <feMerge>
+                            <feMergeNode in="shadowMatrixOuter1"/>
+                            <feMergeNode in="SourceGraphic"/>
+                        </feMerge>
+                    </filter>
+                </defs>
+                <g filter="url(#srumujwtua)" transform="translate(6 -2)" fill="#211F1F" fill-rule="nonzero">
+                    <path d="m21.336 23.22-2.445 1.597a1.081 1.081 0 0 1-.554.162H17.14c-2.022 0-3.14 1.167-3.14 3.275v3.493c0 2.109 1.118 3.275 3.14 3.275h1.197c.189 0 .389.06.567.17l2.432 1.59c2.527 1.653 4.805.337 4.805-2.773v-8.016c0-3.116-2.275-4.428-4.805-2.774zm3.549 2.773v8.016c0 2.08-1.191 2.769-2.882 1.663l-2.445-1.598a2.321 2.321 0 0 0-1.22-.362H17.14c-1.328 0-1.884-.58-1.884-1.965v-3.493c0-1.385.556-1.965 1.884-1.965h1.197c.42 0 .84-.125 1.208-.353l2.458-1.607c1.694-1.107 2.882-.422 2.882 1.664zM27.648 25.984a.611.611 0 0 1 .879.13 6.694 6.694 0 0 1 0 7.773.611.611 0 0 1-.88.13.674.674 0 0 1-.124-.916 5.34 5.34 0 0 0 0-6.2.674.674 0 0 1 .125-.917z"/>
+                    <path d="M29.18 23.8a.611.611 0 0 1 .88.131c2.587 3.595 2.587 8.544 0 12.14a.611.611 0 0 1-.88.13.674.674 0 0 1-.125-.917c2.252-3.13 2.252-7.437 0-10.566a.674.674 0 0 1 .125-.917z"/>
+                </g>
+            </svg>
+        </div>
+        <div id="ox-audio__title">
+            <div class="row">
+                <p id="ox-audio__title-bold">This expereince has sound</p>
+                <span id="ox-audio__subtitle">Turn up the volume!</span>
+            </div>
+        </div>
+        <div id="ox-audio__close">
+            <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <filter x="-9%" y="-46.6%" width="118%" height="193.1%" filterUnits="objectBoundingBox" id="9y1gpfaeya">
+                        <feOffset dy="2" in="SourceAlpha" result="shadowOffsetOuter1"/>
+                        <feGaussianBlur stdDeviation="6" in="shadowOffsetOuter1" result="shadowBlurOuter1"/>
+                        <feColorMatrix values="0 0 0 0 0.129411765 0 0 0 0 0.121568627 0 0 0 0 0.121568627 0 0 0 0.24 0" in="shadowBlurOuter1" result="shadowMatrixOuter1"/>
+                        <feMerge>
+                            <feMergeNode in="shadowMatrixOuter1"/>
+                            <feMergeNode in="SourceGraphic"/>
+                        </feMerge>
+                    </filter>
+                </defs>
+                <g filter="url(#9y1gpfaeya)" transform="translate(-259 -15)" fill="#E3E1E5" fill-rule="evenodd">
+                    <path d="M270.254 24.244a.833.833 0 0 1 1.11-.06l.068.06L275 27.812l3.568-3.568a.833.833 0 0 1 1.11-.06l.078.07a.833.833 0 0 1 0 1.178L276.188 29l3.568 3.568a.833.833 0 0 1 .06 1.11l-.07.078a.833.833 0 0 1-1.11.06l-.068-.06L275 30.188l-3.568 3.568a.833.833 0 0 1-1.11.06l-.078-.07a.833.833 0 0 1 0-1.178L273.812 29l-3.568-3.568a.833.833 0 0 1-.06-1.11l.07-.078z"/>
+                </g>
+            </svg>
+        </div>
+    </div>
+</div>
+
+<div id="ox_q-banner">
+    <a href="https://www.onirix.com/es/" target="_blank">
+        <img src="https://www.onirix.com/ox-experiences/onirix/logo-horizontal-white.svg">
+    </a>
+</div>
+
+<section id="ox_q-cards">
+
+    <div id="ox_q-question" class="ox_q-target-card">
+        <img src="https://www.onirix.com/ox-experiences/onirix/ox-question-header.jpg">
+        <p id="ox_q-question__statement"></p>
+        <ul class="ox_q-options">
+            <li id="ox_answer__1"></li>
+            <li id="ox_answer__2"></li>
+        </ul>
+    </div>
+
+    <div id="ox_q-success-card" class="ox_q-target-card">
+        <img src="https://www.onirix.com/ox-experiences/onirix/ox-question-correct.jpg">
+        <h2>Great!</h2>
+        <p id="ox-success-card__statement">You have answered correctly! Continue with more questions</p>
+        <button id="ox-next-question" class="ox_q-button">Next Question</button>
+    </div>
+
+    <div id="ox_q-fail-card" class="ox_q-target-card">
+        <img src="https://www.onirix.com/ox-experiences/onirix/ox-question-incorrect.jpg">
+        <h2>Oooooooh!</h2>
+        <p>Sorry but you missed the question. You can try again if you want...</p>
+        <a id="ox-try-again" class="ox_q-button">Try again</a>
+    </div>
+
+</section>
+</body>
+</html>
